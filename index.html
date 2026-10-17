@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>¿Perro o Gato? CNN</title>
+  <link rel="icon" type="image/png" href="logo_unison.png">
+  <style>
+    :root {
+      --fondo: #f4f5f7;
+      --tarjeta: #ffffff;
+      --texto: #1c1f24;
+      --suave: #6b7280;
+      --borde: #e2e5ea;
+      --principal: #2563eb;
+      --texto-principal: #ffffff;
+      --perro: #d97706;
+      --gato: #7c3aed;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fondo: #111317;
+        --tarjeta: #1b1e24;
+        --texto: #eceef1;
+        --suave: #9aa1ac;
+        --borde: #2c3038;
+        --principal: #60a5fa;
+        --texto-principal: #0b1220;
+        --perro: #fbbf24;
+        --gato: #a78bfa;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--fondo);
+      color: var(--texto);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    main { max-width: 560px; margin: 0 auto; padding: 16px; }
+    .encabezado { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+    .encabezado img { width: 110px; height: auto; flex-shrink: 0; }
+    @media (max-width: 420px) { .encabezado img { width: 90px; } }
+    .escuela { font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--suave); margin: 0; }
+    h1 { font-size: 1.35rem; margin: 2px 0 2px; }
+    .sub { color: var(--suave); font-size: .9rem; margin: 0; }
+    .tarjeta {
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    /* Visor cuadrado: aquí se ve la cámara o la foto */
+    #visor {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #visor video, #visor canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    #visor .mensaje {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 20px;
+      color: #9aa1ac; font-size: .95rem;
+    }
+    .oculto { display: none !important; }
+    .botones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    button, .boton {
+      font: inherit; font-weight: 600; text-align: center;
+      border: 0; border-radius: 10px;
+      padding: 14px 10px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .4; cursor: default; }
+    #btn-foto { grid-column: 1 / -1; background: var(--principal); color: var(--texto-principal); font-size: 1.05rem; }
+    #btn-camara, .boton { background: transparent; color: var(--texto); border: 1px solid var(--borde); }
+    #estado { font-size: .85rem; color: var(--suave); margin-top: 10px; text-align: center; min-height: 1.2em; }
+    #resultado { text-align: center; }
+    #resultado .emoji { font-size: 4rem; line-height: 1; }
+    #resultado .clase { font-size: 2rem; font-weight: 800; margin: 6px 0 2px; }
+    #resultado .confianza { color: var(--suave); }
+    .medidor { margin: 16px 0 4px; }
+    .medidor .pista {
+      position: relative; height: 14px; border-radius: 7px;
+      background: linear-gradient(to right, var(--gato), var(--borde) 50%, var(--perro));
+    }
+    .medidor .aguja {
+      position: absolute; top: -5px; width: 6px; height: 24px; margin-left: -3px;
+      background: var(--texto); border-radius: 3px;
+      left: 50%; transition: left .4s;
+    }
+    .medidor .extremos { display: flex; justify-content: space-between; font-size: .8rem; color: var(--suave); margin-top: 6px; }
+    .detalle { font-size: .78rem; color: var(--suave); margin-top: 10px; }
+    .vista-red { display: flex; align-items: center; gap: 12px; font-size: .8rem; color: var(--suave); margin-top: 12px; justify-content: center; }
+    #vista100 { width: 70px; height: 70px; border-radius: 6px; background: #000; image-rendering: pixelated; }
+  </style>
+</head>
+<body>
+<main>
+  <header class="encabezado">
+    <img src="logo_unison.png" alt="Escudo de la Universidad de Sonora">
+    <div>
+      <p class="escuela">Universidad de Sonora · Redes Neuronales</p>
+      <h1>¿Perro o Gato? 🐶🐱</h1>
+      <p class="sub">Apunta la cámara a un perro o un gato (o a una foto de uno) y una red convolucional (CNN) adivina cuál es.</p>
+    </div>
+  </header>
+
+  <section class="tarjeta">
+    <div id="visor">
+      <video id="video" playsinline muted class="oculto"></video>
+      <canvas id="foto" class="oculto"></canvas>
+      <div class="mensaje" id="mensaje-visor">Presiona «Abrir cámara» o sube una foto</div>
+    </div>
+    <div class="botones">
+      <button id="btn-foto" disabled>📸 Tomar foto y reconocer</button>
+      <button id="btn-camara">🎥 Abrir cámara</button>
+      <label class="boton">🖼️ Subir foto
+        <input type="file" id="archivo" accept="image/*" class="oculto">
+      </label>
+    </div>
+    <div id="estado">Cargando modelo…</div>
+  </section>
+
+  <section class="tarjeta oculto" id="resultado"></section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
+<script>
+  const TAMANO_IMG = 100;   //La red se entrenó con fotos de 100x100 en blanco y negro
+  let modelo = null;
+  let camaraLista = false;
+
+  const video = document.getElementById("video");
+  const foto = document.getElementById("foto");
+  const mensajeVisor = document.getElementById("mensaje-visor");
+  const btnFoto = document.getElementById("btn-foto");
+  const btnCamara = document.getElementById("btn-camara");
+  const estado = document.getElementById("estado");
+  const resultado = document.getElementById("resultado");
+
+  // ---------- Cámara ----------
+  async function abrirCamara() {
+    try {
+      //facingMode "environment" = cámara trasera del celular
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await video.play();
+      camaraLista = true;
+      mostrarEnVisor("video");
+      resultado.classList.add("oculto");
+      btnFoto.textContent = "📸 Tomar foto y reconocer";
+      btnFoto.disabled = !modelo;
+      estado.textContent = "Apunta a un perro o un gato y toma la foto.";
+    } catch (err) {
+      console.error(err);
+      estado.textContent = location.protocol === "https:" || location.hostname === "localhost"
+        ? "No se pudo abrir la cámara. Revisa que le diste permiso al navegador."
+        : "La cámara solo funciona con https (usa el link de ngrok). Mientras, puedes subir una foto.";
+    }
+  }
+
+  function mostrarEnVisor(que) {
+    video.classList.toggle("oculto", que !== "video");
+    foto.classList.toggle("oculto", que !== "foto");
+    mensajeVisor.classList.add("oculto");
+  }
+
+  //Copia un recorte CUADRADO del centro de la imagen al canvas "foto" (lo que se ve en el visor)
+  function congelar(fuente, ancho, alto) {
+    const lado = Math.min(ancho, alto);
+    foto.width = lado; foto.height = lado;
+    foto.getContext("2d").drawImage(fuente, (ancho - lado) / 2, (alto - lado) / 2, lado, lado, 0, 0, lado, lado);
+    mostrarEnVisor("foto");
+  }
+
+  btnCamara.addEventListener("click", abrirCamara);
+
+  btnFoto.addEventListener("click", () => {
+    //Si ya hay una foto congelada, el botón sirve para volver a la cámara
+    if (!foto.classList.contains("oculto") && camaraLista) {
+      mostrarEnVisor("video");
+      resultado.classList.add("oculto");
+      btnFoto.textContent = "📸 Tomar foto y reconocer";
+      estado.textContent = "Apunta a un perro o un gato y toma la foto.";
+      return;
+    }
+    congelar(video, video.videoWidth, video.videoHeight);
+    reconocer();
+    btnFoto.textContent = "🔄 Tomar otra foto";
+  });
+
+  // ---------- Subir foto de la galería ----------
+  document.getElementById("archivo").addEventListener("change", e => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const img = new Image();
+    img.onload = () => {
+      congelar(img, img.naturalWidth, img.naturalHeight);
+      URL.revokeObjectURL(img.src);
+      reconocer();
+      if (camaraLista) btnFoto.textContent = "🔄 Tomar otra foto";
+    };
+    img.src = URL.createObjectURL(archivo);
+    e.target.value = "";   //Para poder subir la misma foto otra vez
+  });
+
+  // ---------- Preprocesamiento (igual que en Python) ----------
+  //En clase: cv2.resize(imagen, (100, 100)) y luego cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY), y /255.
+  //Ojo: tfds entrega las fotos en RGB pero se usó BGR2GRAY, así que la fórmula de gris quedó
+  //con los pesos del rojo y el azul intercambiados. La copiamos igual para que la red vea lo mismo.
+  function preprocesar() {
+    const chico = document.getElementById("vista100");
+    const ctx = chico.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(foto, 0, 0, TAMANO_IMG, TAMANO_IMG);
+    const px = ctx.getImageData(0, 0, TAMANO_IMG, TAMANO_IMG);
+    const valores = new Float32Array(TAMANO_IMG * TAMANO_IMG);
+    for (let i = 0; i < valores.length; i++) {
+      const r = px.data[i * 4], g = px.data[i * 4 + 1], b = px.data[i * 4 + 2];
+      const gris = 0.114 * r + 0.587 * g + 0.299 * b;
+      valores[i] = gris / 255;
+      //Pintar la vista previa en gris (lo que "ve" la red)
+      px.data[i * 4] = px.data[i * 4 + 1] = px.data[i * 4 + 2] = gris;
+    }
+    ctx.putImageData(px, 0, 0);
+    return tf.tensor4d(valores, [1, TAMANO_IMG, TAMANO_IMG, 1]);
+  }
+
+  // ---------- Predicción ----------
+  function reconocer() {
+    if (!modelo) return;
+    resultado.classList.remove("oculto");
+    resultado.innerHTML = `<canvas id="vista100" width="${TAMANO_IMG}" height="${TAMANO_IMG}" class="oculto"></canvas>`;
+    const entrada = preprocesar();
+    const inicio = performance.now();
+    //Sigmoide: 0 = gato, 1 = perro
+    const p = modelo.predict(entrada).dataSync()[0];
+    const ms = performance.now() - inicio;
+    entrada.dispose();
+
+    const esPerro = p >= 0.5;
+    const confianza = esPerro ? p : 1 - p;
+    const vista = document.getElementById("vista100").toDataURL();
+    resultado.innerHTML = `
+      <div class="emoji">${esPerro ? "🐶" : "🐱"}</div>
+      <div class="clase" style="color: var(${esPerro ? "--perro" : "--gato"})">${esPerro ? "¡Es un perro!" : "¡Es un gato!"}</div>
+      <div class="confianza">${(confianza * 100).toFixed(1)}% de confianza</div>
+      <div class="medidor">
+        <div class="pista"><div class="aguja" id="aguja"></div></div>
+        <div class="extremos"><span>🐱 Gato</span><span>Perro 🐶</span></div>
+      </div>
+      <div class="vista-red">
+        <img id="vista100" src="${vista}" width="70" height="70" alt="">
+        <span>Así ve la foto la red:<br>100 × 100 en blanco y negro</span>
+      </div>
+      <div class="detalle">Salida de la red: ${p.toFixed(3)} (0 = gato, 1 = perro) · ${modelo.countParams().toLocaleString("es-MX")} parámetros · ${ms.toFixed(0)} ms</div>`;
+    requestAnimationFrame(() => document.getElementById("aguja").style.left = (p * 100) + "%");
+    estado.textContent = camaraLista ? "Presiona «Tomar otra foto» para probar de nuevo." : "Sube otra foto para probar de nuevo.";
+  }
+
+  // ---------- Cargar el modelo exportado ----------
+  (async () => {
+    try {
+      modelo = await tf.loadLayersModel("modelo/model.json");
+      //Primera predicción "en vacío" para que la primera de verdad no sea lenta
+      tf.tidy(() => modelo.predict(tf.zeros([1, TAMANO_IMG, TAMANO_IMG, 1])));
+      btnFoto.disabled = !camaraLista;
+      estado.textContent = "Modelo listo. Abre la cámara o sube una foto.";
+    } catch (err) {
+      console.error(err);
+      estado.textContent = "No se pudo cargar el modelo. ¿Está en la carpeta modelo/? ¿Abriste la página con un servidor?";
+    }
+  })();
+</script>
+</body>
+</html>
